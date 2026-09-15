@@ -1,0 +1,8 @@
+spring:
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+
+gateway:
+  rate-limit:
+    requests-per-minute: ${GATEWAY_RATE_LIMIT_REQUESTS_PER_MINUTE:60}

@@ -1,0 +1,7 @@
+server:
+  port: ${CUSTOMER_SERVICE_PORT:8082}
+spring:
+  datasource:
+    url: ${CUSTOMER_DB_URL:jdbc:h2:file:./data/customer-db}
+    username: ${CUSTOMER_DB_USERNAME:sa}
+    password: ${CUSTOMER_DB_PASSWORD:}

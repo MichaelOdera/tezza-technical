@@ -1,0 +1,218 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tezza-runtime-secrets
+type: Opaque
+stringData:
+  # Encrypted credentials referenced by config-server and security filters
+  CONFIG_ENCRYPT_KEY: "change-this-development-encryption-key"
+  CONFIG_SERVER_USERNAME: "config-client"
+  CONFIG_SERVER_PASSWORD: "change-this-development-password"
+  GATEWAY_JWT_SECRET: "change-this-development-secret-to-at-least-32-characters"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tezza-service-config
+data:
+  CONFIG_SERVER_URL: http://config-server:8888
+  RABBITMQ_HOST: rabbitmq
+  REDIS_HOST: redis
+  PRODUCT_SERVICE_URL: http://product-service:8081
+  CUSTOMER_SERVICE_URL: http://customer-service:8082
+  LOAN_SERVICE_URL: http://loan-service:8083
+  NOTIFICATION_SERVICE_URL: http://notification-service:8084
+---
+# =========================================================================
+# SPRING MICROSERVICES CENTRAL PLATFORM CORE
+# =========================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: config-server
+  template:
+    metadata:
+      labels:
+        app: config-server
+    spec:
+      containers:
+        - name: config-server
+          image: tezza/config-server:0.0.1
+          ports:
+            - containerPort: 8888
+          envFrom:
+            - configMapRef:
+                name: tezza-service-config
+            - secretRef:
+                name: tezza-runtime-secrets
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8888
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-server
+spec:
+  selector:
+    app: config-server
+  ports:
+    - port: 8888
+      targetPort: 8888
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway-service
+  template:
+    metadata:
+      labels:
+        app: gateway-service
+    spec:
+      initContainers:
+        - name: wait-for-config-server
+          image: busybox:1.36
+          command: ['sh', '-c', 'until wget --no-verbose --spider http://config-server:8888/actuator/health; do echo waiting for config-server; sleep 2; done;']
+      containers:
+        - name: gateway-service
+          image: tezza/gateway-service:0.0.1
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: tezza-service-config
+            - secretRef:
+                name: tezza-runtime-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-service
+spec:
+  type: LoadBalancer # Public entrance point for cluster API clients
+  selector:
+    app: gateway-service
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+# =========================================================================
+# BUSINESS DOMAIN MICROSERVICES
+# =========================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: product-service } }
+  template:
+    metadata: { labels: { app: product-service } }
+    spec:
+      initContainers:
+        - name: wait-for-config-server
+          image: busybox:1.36
+          command: ['sh', '-c', 'until wget --no-verbose --spider http://config-server:8888/actuator/health; do echo waiting for config-server; sleep 2; done;']
+      containers:
+        - name: product-service
+          image: tezza/product-service:0.0.1
+          ports: [{ containerPort: 8081 }]
+          envFrom: [{ configMapRef: { name: tezza-service-config } }, { secretRef: { name: tezza-runtime-secrets } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: product-service }
+spec:
+  selector: { app: product-service }
+  ports: [{ port: 8081, targetPort: 8081 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: customer-service }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: customer-service } }
+  template:
+    metadata: { labels: { app: customer-service } }
+    spec:
+      initContainers:
+        - name: wait-for-config-server
+          image: busybox:1.36
+          command: ['sh', '-c', 'until wget --no-verbose --spider http://config-server:8888/actuator/health; do echo waiting for config-server; sleep 2; done;']
+      containers:
+        - name: customer-service
+          image: tezza/customer-service:0.0.1
+          ports: [{ containerPort: 8082 }]
+          envFrom: [{ configMapRef: { name: tezza-service-config } }, { secretRef: { name: tezza-runtime-secrets } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: customer-service }
+spec:
+  selector: { app: customer-service }
+  ports: [{ port: 8082, targetPort: 8082 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: loan-service }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: loan-service } }
+  template:
+    metadata: { labels: { app: loan-service } }
+    spec:
+      initContainers:
+        - name: wait-for-config-server
+          image: busybox:1.36
+          command: ['sh', '-c', 'until wget --no-verbose --spider http://config-server:8888/actuator/health; do echo waiting for config-server; sleep 2; done;']
+      containers:
+        - name: loan-service
+          image: tezza/loan-service:0.0.1
+          ports: [{ containerPort: 8083 }]
+          envFrom: [{ configMapRef: { name: tezza-service-config } }, { secretRef: { name: tezza-runtime-secrets } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: loan-service }
+spec:
+  selector: { app: loan-service }
+  ports: [{ port: 8083, targetPort: 8083 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: notification-service }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: notification-service } }
+  template:
+    metadata: { labels: { app: notification-service } }
+    spec:
+      initContainers:
+        - name: wait-for-config-server
+          image: busybox:1.36
+          command: ['sh', '-c', 'until wget --no-verbose --spider http://config-server:8888/actuator/health; do echo waiting for config-server; sleep 2; done;']
+      containers:
+        - name: notification-service
+          image: tezza/notification-service:0.0.1
+          ports: [{ containerPort: 8084 }]
+          envFrom: [{ configMapRef: { name: tezza-service-config } }, { secretRef: { name: tezza-runtime-secrets } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: notification-service }
+spec:
+  selector: { app: notification-service }
+  ports: [{ port: 8084, targetPort: 8084 }]

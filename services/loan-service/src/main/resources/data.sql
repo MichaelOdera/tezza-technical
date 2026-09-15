@@ -1,0 +1,3 @@
+-- Loan Service seed reference.
+-- Loans are intentionally not seeded because they require valid customer and product
+-- IDs from the other services. Create them through POST /api/loans after startup.

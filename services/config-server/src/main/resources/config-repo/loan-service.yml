@@ -1,0 +1,6 @@
+server:
+  port: ${LOAN_SERVICE_PORT:8083}
+services:
+  product-url: ${PRODUCT_SERVICE_URL:}
+  customer-url: ${CUSTOMER_SERVICE_URL:}
+  sweep-fixed-delay-ms: ${LOAN_SWEEP_FIXED_DELAY_MS:3600000}

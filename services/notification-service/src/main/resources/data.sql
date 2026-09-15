@@ -1,0 +1,2 @@
+-- Notification Service seed reference.
+-- Notifications are created from typed RabbitMQ events and are not seeded directly.

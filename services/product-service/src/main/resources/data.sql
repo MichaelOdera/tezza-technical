@@ -1,0 +1,3 @@
+-- Product Service seed reference.
+-- Runtime demo seed data is created by com.tezza.product.SeedData so generated IDs
+-- can be returned by the API and published in RabbitMQ events.

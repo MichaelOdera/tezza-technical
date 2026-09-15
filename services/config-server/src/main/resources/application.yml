@@ -1,0 +1,26 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  profiles:
+    active: native
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: classpath:/config-repo
+  security:
+    user:
+      name: ${CONFIG_SERVER_USERNAME:config-client}
+      password: ${CONFIG_SERVER_PASSWORD}
+
+encrypt:
+  key: ${CONFIG_ENCRYPT_KEY:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,refresh

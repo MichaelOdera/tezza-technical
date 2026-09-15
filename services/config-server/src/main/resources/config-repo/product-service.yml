@@ -1,0 +1,7 @@
+server:
+  port: ${PRODUCT_SERVICE_PORT:8081}
+spring:
+  datasource:
+    url: ${PRODUCT_DB_URL:jdbc:h2:file:./data/product-db}
+    username: ${PRODUCT_DB_USERNAME:sa}
+    password: ${PRODUCT_DB_PASSWORD:}

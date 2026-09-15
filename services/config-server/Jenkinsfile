@@ -1,0 +1,20 @@
+pipeline {
+    agent any
+    options { skipDefaultCheckout(true); timestamps() }
+    parameters {
+        string(name: 'IMAGE_REGISTRY', defaultValue: 'ghcr.io/your-org', description: 'Container registry namespace')
+        string(name: 'KUBERNETES_NAMESPACE', defaultValue: 'tezza', description: 'Kubernetes or OpenShift namespace')
+        string(name: 'KUBECONFIG_CREDENTIALS_ID', defaultValue: 'tezza-kubeconfig', description: 'Jenkins file credential ID')
+        string(name: 'REGISTRY_CREDENTIALS_ID', defaultValue: 'tezza-registry', description: 'Jenkins username/password credential ID')
+    }
+    environment { SERVICE_NAME = 'config-server' }
+    stages {
+        stage('Checkout') { steps { checkout scm } }
+        stage('Set Image Tag') { steps { script { env.IMAGE = "${params.IMAGE_REGISTRY}/config-server:${env.GIT_COMMIT ?: env.BUILD_NUMBER}" } } }
+        stage('Test and Package') { steps { sh './mvnw -pl services/config-server -am clean verify' } }
+        stage('Build Image') { steps { sh "docker build -f services/config-server/Dockerfile -t ${IMAGE} ." } }
+        stage('Push Image') { steps { withCredentials([usernamePassword(credentialsId: params.REGISTRY_CREDENTIALS_ID, usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) { sh "echo \"${REGISTRY_PASSWORD}\" | docker login ${params.IMAGE_REGISTRY.split('/')[0]} -u \"${REGISTRY_USER}\" --password-stdin"; sh "docker push ${IMAGE}" } } }
+        stage('Deploy') { steps { withKubeConfig([credentialsId: params.KUBECONFIG_CREDENTIALS_ID]) { sh "kubectl -n ${params.KUBERNETES_NAMESPACE} apply -f services/config-server/k8s.yaml"; sh "kubectl -n ${params.KUBERNETES_NAMESPACE} set image deployment/${SERVICE_NAME} ${SERVICE_NAME}=${IMAGE}"; sh "kubectl -n ${params.KUBERNETES_NAMESPACE} rollout status deployment/${SERVICE_NAME} --timeout=180s" } } }
+    }
+    post { always { sh 'docker logout ${IMAGE_REGISTRY%%/*} || true' }; failure { echo "${SERVICE_NAME} deployment failed; use kubectl rollout undo for rollback." } }
+}
